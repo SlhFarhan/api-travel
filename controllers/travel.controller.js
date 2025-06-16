@@ -124,27 +124,33 @@ exports.updateTravel = async (req, res) => {
             return res.status(403).send({ message: "Forbidden: You do not own this entry." });
         }
         
-        let imageId = travel.imageId;
+        // Asumsi nama kolom di database adalah 'gambar' dan menyimpan URL lengkap
+        let imageUrl = travel.gambar; 
+
         if (req.file) {
-            // Jika imageId lama bukan URL (artinya file lokal), hapus file lama
-            if (travel.imageId && !isURL(travel.imageId)) {
-                fs.unlink(path.join(__dirname, '..', 'uploads', travel.imageId), (err) => {
+            // Jika ada file baru, coba hapus file lama dari storage
+            if (travel.gambar) {
+                // Ambil nama file dari URL lengkap untuk dihapus
+                const oldFilename = travel.gambar.split('/').pop();
+                // Gunakan path.join untuk path yang aman
+                fs.unlink(path.join(__dirname, '..', 'uploads', oldFilename), (err) => {
                     if (err) console.error("Failed to delete old image:", err);
                 });
             }
-            imageId = req.file.filename; // Simpan nama file baru
+            
+            // PERBAIKAN #2: Selalu buat dan simpan URL lengkap
+            imageUrl = `${process.env.BASE_URL}/uploads/${req.file.filename}`;
         }
         
         const { judulPerjalanan, cerita } = req.body;
         await travel.update({
             judulPerjalanan: judulPerjalanan || travel.judulPerjalanan,
             cerita: cerita || travel.cerita,
-            imageId: imageId
+            gambar: imageUrl // Simpan URL lengkap ke database
         });
         
-        const updatedTravel = await Travel.findByPk(req.params.id);
-        const responseData = formatTravelResponse(updatedTravel, req.userId);
-        res.send({ message: "Travel entry updated successfully!", travel: responseData });
+        // PERBAIKAN #1: Kirim kembali objek 'travel' yang sudah diupdate secara langsung
+        res.send(travel);
 
     } catch (error) {
         res.status(500).send({ message: error.message });

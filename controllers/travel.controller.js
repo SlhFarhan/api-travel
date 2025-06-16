@@ -1,11 +1,6 @@
-const { Travel, User } = require('../models');
+const { Travel } = require('../models');
 const fs = require('fs');
 const path = require('path');
-
-// --- HELPER FUNCTIONS SUDAH TIDAK DIPERLUKAN LAGI JIKA DATA KONSISTEN ---
-// const isURL = ... (bisa dihapus)
-// const getUserIdFromToken = ... (bisa dihapus jika menggunakan middleware)
-// const formatTravelResponse = ... (bisa dihapus)
 
 // Get all travel entries
 exports.getAllTravels = async (req, res) => {
@@ -13,7 +8,6 @@ exports.getAllTravels = async (req, res) => {
         const travels = await Travel.findAll({
             order: [['createdAt', 'DESC']],
         });
-        // Kirim data mentah. Biarkan klien yang menentukan item mana miliknya.
         res.send(travels);
     } catch (error) {
         res.status(500).send({ message: error.message });
@@ -45,16 +39,18 @@ exports.createTravel = async (req, res) => {
             return res.status(400).send({ message: "Title and story are required." });
         }
 
-        // PERBAIKAN: Buat dan simpan URL lengkap dari awal
+        // PERBAIKAN: Buat URL lengkap
         const imageUrl = `${process.env.BASE_URL}/uploads/${req.file.filename}`;
 
         const newTravel = await Travel.create({
             judulPerjalanan,
             cerita,
-            gambar: imageUrl, // Simpan URL lengkap, bukan nama file
+            // PERBAIKAN: Simpan URL lengkap ke kolom 'imageId'
+            imageId: imageUrl,
             userId: req.userId
         });
 
+        // Kirim kembali objek yang baru dibuat secara langsung
         res.status(201).send(newTravel);
     } catch (error) {
         res.status(500).send({ message: error.message });
@@ -73,15 +69,18 @@ exports.updateTravel = async (req, res) => {
             return res.status(403).send({ message: "Forbidden: You do not own this entry." });
         }
         
-        let imageUrl = travel.gambar; 
+        // Ambil URL lama dari kolom 'imageId'
+        let imageUrl = travel.imageId; 
+
         if (req.file) {
-            if (travel.gambar) {
-                const oldFilename = travel.gambar.split('/').pop();
+            // Hapus file lama jika ada
+            if (travel.imageId) {
+                const oldFilename = travel.imageId.split('/').pop();
                 fs.unlink(path.join(__dirname, '..', 'uploads', oldFilename), (err) => {
                     if (err) console.error("Failed to delete old image:", err);
                 });
             }
-            // PERBAIKAN: Selalu buat dan simpan URL lengkap
+            // Buat URL lengkap yang baru
             imageUrl = `${process.env.BASE_URL}/uploads/${req.file.filename}`;
         }
         
@@ -89,9 +88,11 @@ exports.updateTravel = async (req, res) => {
         await travel.update({
             judulPerjalanan: judulPerjalanan || travel.judulPerjalanan,
             cerita: cerita || travel.cerita,
-            gambar: imageUrl
+            // PERBAIKAN: Update kolom 'imageId' dengan URL lengkap
+            imageId: imageUrl
         });
         
+        // Kirim kembali objek yang sudah diupdate secara langsung
         res.send(travel);
     } catch (error) {
         res.status(500).send({ message: error.message });
@@ -110,15 +111,15 @@ exports.deleteTravel = async (req, res) => {
         }
 
         // Hapus file gambar dari storage
-        if (travel.gambar) {
-            const filename = travel.gambar.split('/').pop();
+        if (travel.imageId) {
+            // PERBAIKAN: Ambil nama file dari URL di kolom 'imageId'
+            const filename = travel.imageId.split('/').pop();
             fs.unlink(path.join(__dirname, '..', 'uploads', filename), (err) => {
                 if (err) console.error("Failed to delete image:", err);
             });
         }
         
         await travel.destroy();
-        // Cukup kirim status sukses, tidak perlu body
         res.status(200).send({ message: "Travel entry deleted successfully!" });
     } catch (error) {
         res.status(500).send({ message: error.message });

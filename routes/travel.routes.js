@@ -9,8 +9,8 @@ router.get('/', controller.getAllTravels);
 router.get('/:id', controller.getTravelById);
 
 // Protected routes (require token)
-router.post('/', [verifyToken, upload.single('imageId')], controller.createTravel);
-router.put('/:id', [verifyToken, upload.single('imageId')], controller.updateTravel);
+router.post('/', [verifyToken, upload.single('gambar')], controller.createTravel);
+router.put('/:id', [verifyToken, upload.single('gambar')], controller.updateTravel);
 router.delete('/:id', [verifyToken], controller.deleteTravel);
 
 module.exports = router;
